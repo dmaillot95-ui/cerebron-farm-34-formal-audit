@@ -1,7 +1,9 @@
 import os,json,subprocess,hashlib,pathlib
+from runtime_registry import load_context
 PREFERRED=['/generate','/chat','/predict','/respond','/infer','/run']
 ROLE=os.environ['ROLE']; MODEL=os.environ['MODEL']; FOCUS=os.environ.get('FOCUS','formal audit')
 MISSION=pathlib.Path('MISSION.md').read_text(encoding='utf-8')
+REGISTRY_CONTEXT,REGISTRY_META=load_context(['constitution','disciplines','keys'])
 
 def run(cmd,timeout=240):
     try: return subprocess.run(cmd,capture_output=True,text=True,timeout=timeout)
@@ -52,9 +54,9 @@ def invoke(space,prompt):
         errs.append((ep,pred.stderr[-700:]))
     return False,'',{'error':repr(errs[-4:])}
 
-prompt=f'''You are {ROLE} in CEREBRON Omega Farm 34 Formal Audit. Focus: {FOCUS}.\n{MISSION}\nAudit the target reasoning class rigorously. Return: CLAIMS, PREMISES, FORMAL DEPENDENCIES, VALID STEPS, INVALID/UNPROVED STEPS, EDGE CASES, COUNTERMODELS OR COUNTEREXAMPLES, DIMENSION/TYPE/DOMAIN CHECKS, REPRODUCTION REQUIREMENTS, EVIDENCE GAPS, VERDICT PER CLAIM, NEXT DECISIVE CHECK. Never upgrade an unproved claim.'''
+prompt=f'''You are {ROLE} in CEREBRON Omega Farm 34 Formal Audit. Focus: {FOCUS}.\n{MISSION}\nCEREBRON RUNTIME CONTEXT (shared registry; guidance only, never self-certifying):\n{REGISTRY_CONTEXT}\nAudit the target reasoning class rigorously. Return: CLAIMS, PREMISES, FORMAL DEPENDENCIES, VALID STEPS, INVALID/UNPROVED STEPS, EDGE CASES, COUNTERMODELS OR COUNTEREXAMPLES, DIMENSION/TYPE/DOMAIN CHECKS, REPRODUCTION REQUIREMENTS, EVIDENCE GAPS, VERDICT PER CLAIM, NEXT DECISIVE CHECK. Never upgrade an unproved claim.'''
 ok,text,meta=invoke(MODEL,prompt)
-rec={'farm':34,'role':ROLE,'model':MODEL,'focus':FOCUS,'inference_success':ok,'status':'UNREVIEWED_EXTERNAL_AGENT_OUTPUT' if ok else 'EXTERNAL_INFERENCE_FAILED','output':text if ok else None,'meta':meta}
+rec={'farm':34,'role':ROLE,'model':MODEL,'focus':FOCUS,'inference_success':ok,'status':'UNREVIEWED_EXTERNAL_AGENT_OUTPUT' if ok else 'EXTERNAL_INFERENCE_FAILED','output':text if ok else None,'registry_runtime':REGISTRY_META,'meta':meta}
 pathlib.Path('results').mkdir(exist_ok=True)
 pathlib.Path(f'results/{ROLE}.json').write_text(json.dumps(rec,ensure_ascii=False,indent=2),encoding='utf-8')
-print(json.dumps({'role':ROLE,'inference_success':ok,'status':rec['status']}))
+print(json.dumps({'role':ROLE,'inference_success':ok,'status':rec['status'],'registry_runtime':REGISTRY_META}))
