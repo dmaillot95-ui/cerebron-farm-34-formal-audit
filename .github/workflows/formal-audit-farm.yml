@@ -1,0 +1,81 @@
+name: CEREBRON Farm 34 Formal Audit
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  agents:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - {role: LOGIC_PROOF_AUDITOR, model: huggingface-projects/llama-3.2-3B-Instruct, focus: deductive validity}
+          - {role: PREMISE_DEPENDENCY_AUDITOR, model: huggingface-projects/gemma-2-9b-it, focus: hidden premises and dependency graph}
+          - {role: QUANTIFIER_SCOPE_AUDITOR, model: huggingface-projects/llama-3.2-3B-Instruct, focus: quantifiers scope universality}
+          - {role: DEFINITION_CONSISTENCY_AUDITOR, model: huggingface-projects/gemma-2-9b-it, focus: definition drift and ambiguity}
+          - {role: ALGEBRA_ARITHMETIC_AUDITOR, model: huggingface-projects/llama-3.2-3B-Instruct, focus: algebra arithmetic exactness}
+          - {role: DIMENSION_UNIT_AUDITOR, model: huggingface-projects/gemma-2-9b-it, focus: dimensions units types}
+          - {role: DOMAIN_VALIDITY_AUDITOR, model: huggingface-projects/llama-3.2-3B-Instruct, focus: domains regimes boundary conditions}
+          - {role: STATISTICAL_INFERENCE_AUDITOR, model: huggingface-projects/gemma-2-9b-it, focus: statistical inference and uncertainty}
+          - {role: CAUSAL_CLAIM_AUDITOR, model: huggingface-projects/llama-3.2-3B-Instruct, focus: causal identification}
+          - {role: MODEL_ASSUMPTION_AUDITOR, model: huggingface-projects/gemma-2-9b-it, focus: model assumptions}
+          - {role: COMPUTATION_REPRODUCIBILITY_AUDITOR, model: huggingface-projects/llama-3.2-3B-Instruct, focus: reproducibility determinism implementation}
+          - {role: FORMAL_SPECIFICATION_AUDITOR, model: huggingface-projects/gemma-2-9b-it, focus: specification completeness}
+          - {role: COUNTERMODEL_SPECIALIST, model: huggingface-projects/llama-3.2-3B-Instruct, focus: countermodels counterexamples}
+          - {role: EDGE_CASE_FORMALIZER, model: huggingface-projects/gemma-2-9b-it, focus: edge and degenerate cases}
+          - {role: CIRCULAR_REASONING_AUDITOR, model: huggingface-projects/llama-3.2-3B-Instruct, focus: circularity and hidden equivalence}
+          - {role: CLAIM_EVIDENCE_LEDGER_AUDITOR, model: huggingface-projects/gemma-2-9b-it, focus: claim evidence alignment}
+          - {role: INDEPENDENT_FORMAL_REPLICATOR, model: huggingface-projects/llama-3.2-3B-Instruct, focus: independent derivation}
+          - {role: ADVERSARIAL_PROOF_CHECKER, model: huggingface-projects/gemma-2-9b-it, focus: adversarial proof attack}
+          - {role: META_AUDIT_VERIFIER, model: huggingface-projects/llama-3.2-3B-Instruct, focus: verify the verifier}
+          - {role: OMEGA_FORMAL_AUDIT_JUDGE, model: huggingface-projects/gemma-2-9b-it, focus: evidence bounded synthesis}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet hf-gradio
+      - name: Run formal audit role
+        continue-on-error: true
+        env:
+          ROLE: ${{ matrix.role }}
+          MODEL: ${{ matrix.model }}
+          FOCUS: ${{ matrix.focus }}
+        run: python worker/agent.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: farm34-${{ matrix.role }}
+          path: results/*.json
+          retention-days: 14
+  omega:
+    needs: agents
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: farm34-*
+          path: collected
+          merge-multiple: true
+      - name: Build Omega packet
+        run: |
+          python - <<'PY'
+          import json,glob,os
+          rows=[]
+          for p in glob.glob('collected/*.json'):
+              try: rows.append(json.load(open(p,encoding='utf-8')))
+              except Exception as e: rows.append({'file':p,'status':'ARTIFACT_PARSE_FAILED','error':repr(e)})
+          ok=[r for r in rows if r.get('inference_success') is True and r.get('status')=='UNREVIEWED_EXTERNAL_AGENT_OUTPUT']
+          packet={'farm':34,'name':'Formal Audit','roles_expected':20,'roles_returned':len(rows),'successful_external_ai_calls':len(ok),'failed_external_ai_calls':len(rows)-len(ok),'epistemic_status':'UNREVIEWED_EXTERNAL_AGENT_OUTPUT','rules':['CLAIM<=EVIDENCE','PROOF!=HEURISTIC','VERIFY THE VERIFIER','UNKNOWN REMAINS UNKNOWN'],'results':rows}
+          os.makedirs('omega',exist_ok=True)
+          json.dump(packet,open('omega/farm34-omega.json','w',encoding='utf-8'),ensure_ascii=False,indent=2)
+          print(json.dumps({k:v for k,v in packet.items() if k!='results'},indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: formal-audit-farm-34-omega-packet
+          path: omega/farm34-omega.json
+          retention-days: 14
