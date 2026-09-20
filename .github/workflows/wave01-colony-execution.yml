@@ -1,0 +1,29 @@
+name: Wave01 F34 to ARGUS Execution
+on:
+  push:
+    paths: ["wave01-trigger.txt",".github/workflows/wave01-colony-execution.yml"]
+permissions: {contents: write}
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python - <<'PY'
+          import json,hashlib,os,datetime
+          task={"id":"W01-ARGUS-F34","farm":"F34","colony":"C12-ARGUS","mission":"Red-team a proof fragment and classify claim strength without upgrading evidence."}
+          result={"role":"red team","checks":["explicit quantifiers","dependency closure","local versus global validity","necessary versus sufficient conditions","evidence level preserved"],"classification":"AUDIT_PACKET_NOT_PROOF"}
+          raw=json.dumps({"task":task,"result":result},sort_keys=True)
+          rec={"schema":"wave01-real-farm-execution-v1","status":"PASS","execution_kind":"GITHUB_FARM_CODE_EXECUTION","farm":task["farm"],"colony":task["colony"],"task_id":task["id"],"output_sha256":hashlib.sha256(raw.encode()).hexdigest(),"executed_at":datetime.datetime.now(datetime.timezone.utc).isoformat(),"claim_limit":"Workflow execution evidence only; not autonomous model reasoning or proof."}
+          os.makedirs("wave01/results",exist_ok=True);os.makedirs("wave01/receipts",exist_ok=True)
+          open("wave01/results/W01-ARGUS-F34.json","w").write(raw+"\n");open("wave01/receipts/W01-ARGUS-F34.json","w").write(json.dumps(rec,indent=2)+"\n")
+          PY
+      - run: |
+          git config user.name cerebron-bot
+          git config user.email actions@users.noreply.github.com
+          git add wave01
+          git diff --cached --quiet && exit 0
+          git commit -m "receipt: execute F34 to ARGUS wave01"
+          git pull --rebase origin "${GITHUB_REF_NAME}" || true
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+ 
